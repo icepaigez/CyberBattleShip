@@ -33,7 +33,7 @@ export function Leaderboard() {
 
     const fetchTeams = async () => {
         try {
-            const response = await fetch(`${API_URL}/api/admin/teams`);
+            const response = await fetch(`${API_URL}/api/competition/teams`);
             const data = await response.json();
             setTeams(data.teams);
         } catch (error) {

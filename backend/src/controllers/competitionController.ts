@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { gameManager } from './teamController.js';
+import { gameManager, getTeamConnections } from './teamController.js';
 import { trafficManager } from '../index.js';
 
 // Set competition duration
@@ -93,5 +93,24 @@ export const getLeaderboard = (_req: Request, res: Response): void => {
   } catch (error) {
     console.error('Error getting leaderboard:', error);
     res.status(500).json({ error: 'Failed to get leaderboard' });
+  }
+};
+
+// Public: Get teams for leaderboard (no auth required)
+export const getPublicTeams = (_req: Request, res: Response): void => {
+  try {
+    const games = gameManager.getAllGames();
+    const teams = games.map(game => ({
+      team_id: game.team_id,
+      team_name: game.team_name,
+      score: game.score,
+      ships_sunk: game.ships_sunk,
+      active_players: getTeamConnections(game.team_id),
+      game_complete: game.isGameComplete(),
+    }));
+    res.json({ teams, count: teams.length });
+  } catch (error) {
+    console.error('Error getting teams:', error);
+    res.status(500).json({ error: 'Failed to get teams' });
   }
 };

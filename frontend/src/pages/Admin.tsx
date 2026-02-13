@@ -1,6 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { NotificationModal, ConfirmModal } from '../components/NotificationModal';
 import { API_URL } from '../api';
+
+const adminFetch = (url: string, options: RequestInit = {}, onUnauthorized: () => void) =>
+    fetch(url, { ...options, credentials: 'include' }).then((res) => {
+        if (res.status === 401) onUnauthorized();
+        return res;
+    });
 
 interface Team {
     team_id: string;
@@ -32,6 +38,9 @@ interface ConfirmDialog {
 }
 
 export function Admin() {
+    const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+    const [loginError, setLoginError] = useState<string>('');
+    const [loginLoading, setLoginLoading] = useState(false);
     const [teams, setTeams] = useState<Team[]>([]);
     const [status, setStatus] = useState<CompetitionStatus>({ active: false, duration_minutes: 90 });
     const [loading, setLoading] = useState(false);
@@ -41,7 +50,30 @@ export function Admin() {
     const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog | null>(null);
     const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set());
 
+    const onUnauthorized = useCallback(() => setAuthenticated(false), []);
+
+    const fetchTeams = useCallback(async () => {
+        try {
+            const response = await adminFetch(`${API_URL}/api/admin/teams`, {}, onUnauthorized);
+            const data = await response.json();
+            setTeams(data.teams ?? []);
+        } catch (error) {
+            console.error('Failed to fetch teams:', error);
+        }
+    }, [onUnauthorized]);
+
+    const fetchStatus = useCallback(async () => {
+        try {
+            const response = await fetch(`${API_URL}/api/competition/status`, { credentials: 'include' });
+            const data = await response.json();
+            setStatus(data);
+        } catch (error) {
+            console.error('Failed to fetch status:', error);
+        }
+    }, []);
+
     useEffect(() => {
+        if (authenticated !== true) return;
         fetchTeams();
         fetchStatus();
 
@@ -51,6 +83,17 @@ export function Admin() {
         }, 5000);
 
         return () => clearInterval(interval);
+    }, [authenticated, fetchTeams, fetchStatus]);
+
+    // Check auth on mount
+    useEffect(() => {
+        adminFetch(`${API_URL}/api/admin/teams`, {}, () => setAuthenticated(false))
+            .then((res) => {
+                if (res.ok) setAuthenticated(true);
+                else if (res.status === 401) setAuthenticated(false);
+                else setAuthenticated(false);
+            })
+            .catch(() => setAuthenticated(false));
     }, []);
 
     // Sync duration from status
@@ -60,34 +103,37 @@ export function Admin() {
         }
     }, [status.duration_minutes]);
 
-    const fetchTeams = async () => {
+    const handleLogin = async (password: string) => {
+        setLoginError('');
+        setLoginLoading(true);
         try {
-            const response = await fetch(`${API_URL}/api/admin/teams`);
-            const data = await response.json();
-            setTeams(data.teams);
-        } catch (error) {
-            console.error('Failed to fetch teams:', error);
+            const res = await fetch(`${API_URL}/api/admin/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password }),
+                credentials: 'include',
+            });
+            const data = await res.json();
+            if (res.ok) setAuthenticated(true);
+            else setLoginError(data.error || 'Invalid password');
+        } finally {
+            setLoginLoading(false);
         }
     };
 
-    const fetchStatus = async () => {
-        try {
-            const response = await fetch(`${API_URL}/api/competition/status`);
-            const data = await response.json();
-            setStatus(data);
-        } catch (error) {
-            console.error('Failed to fetch status:', error);
-        }
+    const handleLogout = async () => {
+        await fetch(`${API_URL}/api/admin/logout`, { method: 'POST', credentials: 'include' });
+        setAuthenticated(false);
     };
 
     const setGameDuration = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`${API_URL}/api/competition/duration`, {
+            const response = await adminFetch(`${API_URL}/api/competition/duration`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ duration_minutes: durationMinutes }),
-            });
+            }, onUnauthorized);
             const data = await response.json();
             if (response.ok) {
                 setNotification({ message: `Game duration set to ${durationMinutes} minutes`, type: 'success' });
@@ -104,11 +150,11 @@ export function Admin() {
     const createTeams = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`${API_URL}/api/admin/teams/create-multiple`, {
+            const response = await adminFetch(`${API_URL}/api/admin/teams/create-multiple`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ count: teamCount }),
-            });
+            }, onUnauthorized);
             const data = await response.json();
             setNotification({ message: `Created ${data.count} teams successfully`, type: 'success' });
             fetchTeams();
@@ -121,7 +167,7 @@ export function Admin() {
     const startCompetition = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`${API_URL}/api/competition/start`, { method: 'POST' });
+            const response = await adminFetch(`${API_URL}/api/competition/start`, { method: 'POST' }, onUnauthorized);
             const data = await response.json();
 
             if (response.ok) {
@@ -146,7 +192,7 @@ export function Admin() {
                 setConfirmDialog(null);
                 setLoading(true);
                 try {
-                    await fetch(`${API_URL}/api/competition/end`, { method: 'POST' });
+                    await adminFetch(`${API_URL}/api/competition/end`, { method: 'POST' }, onUnauthorized);
                     setNotification({ message: 'Competition ended', type: 'success' });
                     fetchStatus();
                 } catch (error) {
@@ -165,7 +211,7 @@ export function Admin() {
                 setConfirmDialog(null);
                 setLoading(true);
                 try {
-                    const response = await fetch(`${API_URL}/api/admin/teams/clear`, { method: 'DELETE' });
+                    const response = await adminFetch(`${API_URL}/api/admin/teams/clear`, { method: 'DELETE' }, onUnauthorized);
                     const data = await response.json();
 
                     if (response.ok) {
@@ -197,11 +243,11 @@ export function Admin() {
                 setConfirmDialog(null);
                 setLoading(true);
                 try {
-                    const response = await fetch(`${API_URL}/api/admin/teams/delete-selected`, {
+                    const response = await adminFetch(`${API_URL}/api/admin/teams/delete-selected`, {
                         method: 'DELETE',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ team_ids: Array.from(selectedTeams) })
-                    });
+                    }, onUnauthorized);
                     const data = await response.json();
 
                     if (response.ok) {
@@ -239,11 +285,61 @@ export function Admin() {
         }
     };
 
+    // Loading auth check
+    if (authenticated === null) {
+        return (
+            <div className="admin-page admin-login-container">
+                <h1>🎮 Competition Admin</h1>
+                <p>Checking authentication...</p>
+            </div>
+        );
+    }
+
+    // Login form
+    if (!authenticated) {
+        return (
+            <div className="admin-page admin-login-container">
+                <h1>🎮 Competition Admin</h1>
+                <form
+                    className="admin-login-form"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        const form = e.target as HTMLFormElement;
+                        const password = (form.elements.namedItem('password') as HTMLInputElement)?.value;
+                        if (password) handleLogin(password);
+                    }}
+                >
+                    <input
+                        type="password"
+                        name="password"
+                        placeholder="Admin password"
+                        className="admin-input"
+                        autoFocus
+                        autoComplete="current-password"
+                        disabled={loginLoading}
+                    />
+                    <button type="submit" className="admin-btn admin-btn-primary" disabled={loginLoading}>
+                        {loginLoading ? (
+                            <span className="admin-login-spinner">Logging in...</span>
+                        ) : (
+                            'Log in'
+                        )}
+                    </button>
+                    {loginError && <p className="admin-login-error">{loginError}</p>}
+                </form>
+            </div>
+        );
+    }
+
     return (
         <div className="admin-page">
             <div className="admin-header">
                 <h1>🎮 Competition Admin Dashboard</h1>
-                <div className="status-badge">
+                <div className="admin-header-right">
+                    <button onClick={handleLogout} className="admin-btn admin-btn-secondary" style={{ marginLeft: 'auto' }}>
+                        Log out
+                    </button>
+                    <div className="status-badge">
                     {status.active ? (
                         <span className="badge badge-active">
                             🟢 Active ({status.elapsed_minutes}min elapsed)
@@ -251,6 +347,7 @@ export function Admin() {
                     ) : (
                         <span className="badge badge-inactive">⚪ Not Started</span>
                     )}
+                    </div>
                 </div>
             </div>
 

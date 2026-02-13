@@ -9,15 +9,20 @@ import {
   deleteSelectedTeams,
   claimRandomTeam,
 } from '../controllers/teamController.js';
+import { requireAdminAuth, login, logout } from '../middleware/adminAuth.js';
 
 const router = Router();
 
-// Admin routes
-router.post('/admin/teams/create', createTeam);
-router.post('/admin/teams/create-multiple', createMultipleTeams);
-router.delete('/admin/teams/clear', clearAllTeams);
-router.delete('/admin/teams/delete-selected', deleteSelectedTeams);
-router.get('/admin/teams', getAllTeams);
+// Admin auth (no protection)
+router.post('/admin/login', login);
+router.post('/admin/logout', logout);
+
+// Admin routes (protected)
+router.post('/admin/teams/create', requireAdminAuth, createTeam);
+router.post('/admin/teams/create-multiple', requireAdminAuth, createMultipleTeams);
+router.delete('/admin/teams/clear', requireAdminAuth, clearAllTeams);
+router.delete('/admin/teams/delete-selected', requireAdminAuth, deleteSelectedTeams);
+router.get('/admin/teams', requireAdminAuth, getAllTeams);
 
 // Player routes
 router.post('/teams/join', joinTeam);

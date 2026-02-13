@@ -87,6 +87,11 @@ export class GameDatabase {
         FOREIGN KEY (team_id) REFERENCES teams(team_id)
       );
 
+      CREATE TABLE IF NOT EXISTS admin_sessions (
+        token TEXT PRIMARY KEY,
+        expires_at TEXT NOT NULL
+      );
+
       INSERT OR IGNORE INTO competition (id, is_active, duration_minutes) VALUES (1, 0, 90);
 
       CREATE INDEX IF NOT EXISTS idx_ships_team ON ships(team_id);
@@ -437,6 +442,46 @@ export class GameDatabase {
       }));
     }
     return (this.db as Database.Database).prepare(sql).all() as any[];
+  }
+
+  async saveAdminSession(token: string, expiresAt: Date): Promise<void> {
+    const sql = 'INSERT OR REPLACE INTO admin_sessions (token, expires_at) VALUES (?, ?)';
+    const expiresAtStr = expiresAt.toISOString();
+    if (this.useTurso) {
+      await (this.db as Client).execute({ sql, args: [token, expiresAtStr] });
+    } else {
+      (this.db as Database.Database).prepare(sql).run(token, expiresAtStr);
+    }
+  }
+
+  async getAdminSession(token: string): Promise<Date | undefined> {
+    const sql = 'SELECT expires_at FROM admin_sessions WHERE token = ?';
+    if (this.useTurso) {
+      const rs = await (this.db as Client).execute({ sql, args: [token] });
+      const row = rs.rows[0] as Record<string, unknown> | undefined;
+      return row ? new Date(row.expires_at as string) : undefined;
+    }
+    const row = (this.db as Database.Database).prepare(sql).get(token) as { expires_at: string } | undefined;
+    return row ? new Date(row.expires_at) : undefined;
+  }
+
+  async deleteAdminSession(token: string): Promise<void> {
+    const sql = 'DELETE FROM admin_sessions WHERE token = ?';
+    if (this.useTurso) {
+      await (this.db as Client).execute({ sql, args: [token] });
+    } else {
+      (this.db as Database.Database).prepare(sql).run(token);
+    }
+  }
+
+  async deleteExpiredAdminSessions(): Promise<void> {
+    const now = new Date().toISOString();
+    const sql = 'DELETE FROM admin_sessions WHERE expires_at < ?';
+    if (this.useTurso) {
+      await (this.db as Client).execute({ sql, args: [now] });
+    } else {
+      (this.db as Database.Database).prepare(sql).run(now);
+    }
   }
 
   close(): void {

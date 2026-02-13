@@ -39,6 +39,7 @@ jobs:
           CORS_ORIGIN=${{ secrets.CORS_ORIGIN || '*' }}
           TURSO_DATABASE_URL=${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN=${{ secrets.TURSO_AUTH_TOKEN }}
+          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
           EOF
 
       - name: Configure SSH
