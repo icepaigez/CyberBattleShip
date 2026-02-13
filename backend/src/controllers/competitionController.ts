@@ -3,7 +3,7 @@ import { gameManager } from './teamController.js';
 import { trafficManager } from '../index.js';
 
 // Set competition duration
-export const setCompetitionDuration = (req: Request, res: Response): void => {
+export const setCompetitionDuration = async (req: Request, res: Response): Promise<void> => {
   try {
     const { duration_minutes } = req.body;
     
@@ -12,37 +12,34 @@ export const setCompetitionDuration = (req: Request, res: Response): void => {
       return;
     }
     
-    gameManager.setCompetitionDuration(duration_minutes);
+    await gameManager.setCompetitionDuration(duration_minutes);
     
     res.json({
       success: true,
       message: `Competition duration set to ${duration_minutes} minutes`,
       duration_minutes,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error setting competition duration:', error);
-    res.status(500).json({ error: error.message || 'Failed to set duration' });
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to set duration' });
   }
 };
 
 // Start competition
-export const startCompetition = (_req: Request, res: Response): void => {
+export const startCompetition = async (_req: Request, res: Response): Promise<void> => {
   try {
-    // Check if competition is already active
     if (gameManager.isCompetitionActive()) {
       res.status(400).json({ error: 'Competition is already active' });
       return;
     }
 
-    gameManager.startCompetition();
+    await gameManager.startCompetition();
     const status = gameManager.getCompetitionStatus();
     
-    // Set competition start time for difficulty scaling
     if (status.start_time) {
       trafficManager.setCompetitionStart(status.start_time);
     }
 
-    // Start traffic generation for all teams
     const games = gameManager.getAllGames();
     games.forEach(game => {
       trafficManager.startTrafficForTeam(game.team_id, game);
@@ -61,9 +58,9 @@ export const startCompetition = (_req: Request, res: Response): void => {
 };
 
 // End competition
-export const endCompetition = (_req: Request, res: Response): void => {
+export const endCompetition = async (_req: Request, res: Response): Promise<void> => {
   try {
-    gameManager.endCompetition();
+    await gameManager.endCompetition();
     trafficManager.stopAllTraffic();
 
     res.json({

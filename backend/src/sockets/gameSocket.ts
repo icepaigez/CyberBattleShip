@@ -67,7 +67,7 @@ export function setupGameSocket(io: Server): void {
     });
 
     // Submit coordinate via WebSocket
-    socket.on('submit_coordinate', (data: { team_id: string; row?: string; column?: number; attack_type?: AttackType }) => {
+    socket.on('submit_coordinate', async (data: { team_id: string; row?: string; column?: number; attack_type?: AttackType }) => {
       try {
         const { team_id, row, column, attack_type } = data;
 
@@ -110,7 +110,7 @@ export function setupGameSocket(io: Server): void {
           return;
         }
 
-        const result = gameManager.submitCoordinate(team_id, coord, attack_type);
+        const result = await gameManager.submitCoordinate(team_id, coord, attack_type);
 
         let message = '';
         const coordStr = row && column ? `${row}${column}` : row || `column ${column}`;

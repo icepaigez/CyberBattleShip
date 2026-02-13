@@ -7,6 +7,8 @@ import gameRoutes from './routes/gameRoutes.js';
 import competitionRoutes from './routes/competitionRoutes.js';
 import { setupGameSocket } from './sockets/gameSocket.js';
 import { TrafficManager } from './services/TrafficManager.js';
+import { gameDatabase } from './services/Database.js';
+import { gameManager } from './controllers/teamController.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -50,16 +52,26 @@ setupGameSocket(io);
 // Export io for use in other modules
 export { io };
 
-// Start server
-httpServer.listen(PORT, () => {
-  console.log(`🚀 Backend server running on http://${HOST}:${PORT}`);
-  console.log(`🔌 WebSocket server ready`);
-  console.log(`📡 API routes available at http://${HOST}:${PORT}/api`);
-  console.log(`🌐 CORS enabled for: ${corsOrigin}`);
-  if (HOST !== 'localhost') {
-    console.log(`\n📱 Students should connect to: http://${HOST}:5173`);
-    console.log(`👨‍💼 Admin panel: http://${HOST}:5173/admin\n`);
-  }
+// Async startup: initialize database and game state before accepting connections
+async function start(): Promise<void> {
+  await gameDatabase.initialize();
+  await gameManager.initialize();
+
+  httpServer.listen(PORT, () => {
+    console.log(`🚀 Backend server running on http://${HOST}:${PORT}`);
+    console.log(`🔌 WebSocket server ready`);
+    console.log(`📡 API routes available at http://${HOST}:${PORT}/api`);
+    console.log(`🌐 CORS enabled for: ${corsOrigin}`);
+    if (HOST !== 'localhost') {
+      console.log(`\n📱 Students should connect to: http://${HOST}:5173`);
+      console.log(`👨‍💼 Admin panel: http://${HOST}:5173/admin\n`);
+    }
+  });
+}
+
+start().catch((err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });
 
 // Cleanup on shutdown

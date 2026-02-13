@@ -32,7 +32,7 @@ export class GameState {
   config: GameConfig;
   created_at: Date;
 
-  constructor(team_id: string, team_name: string, config: GameConfig = DEFAULT_CONFIG, loadFromDb: boolean = false) {
+  constructor(team_id: string, team_name: string, config: GameConfig = DEFAULT_CONFIG) {
     this.team_id = team_id;
     this.team_name = team_name;
     this.ships = [];
@@ -41,32 +41,23 @@ export class GameState {
     this.submissions = [];
     this.config = config;
     this.created_at = new Date();
-    
+  }
+
+  async initialize(loadFromDb: boolean): Promise<void> {
     if (loadFromDb) {
-      // Load existing game from database
-      this.loadFromDatabase();
+      const teamData = await gameDatabase.getTeam(this.team_id);
+      if (teamData) {
+        this.team_name = teamData.team_name;
+        this.score = teamData.score;
+        this.ships_sunk = teamData.ships_sunk;
+      }
+      this.ships = await gameDatabase.getShips(this.team_id);
+      this.submissions = await gameDatabase.getSubmissions(this.team_id);
     } else {
-      // Initialize new game
       this.initializeShips();
-      this.persistToDatabase();
+      await gameDatabase.saveTeam(this.team_id, this.team_name, this.score, this.ships_sunk);
+      await gameDatabase.saveShips(this.team_id, this.ships);
     }
-  }
-
-  private loadFromDatabase(): void {
-    const teamData = gameDatabase.getTeam(this.team_id);
-    if (teamData) {
-      this.team_name = teamData.team_name;
-      this.score = teamData.score;
-      this.ships_sunk = teamData.ships_sunk;
-    }
-    
-    this.ships = gameDatabase.getShips(this.team_id);
-    this.submissions = gameDatabase.getSubmissions(this.team_id);
-  }
-
-  private persistToDatabase(): void {
-    gameDatabase.saveTeam(this.team_id, this.team_name, this.score, this.ships_sunk);
-    gameDatabase.saveShips(this.team_id, this.ships);
   }
 
   private initializeShips(): void {
@@ -130,13 +121,13 @@ export class GameState {
     }
   }
 
-  submitCoordinate(coord: Coordinate, attack_type?: AttackType): { 
+  async submitCoordinate(coord: Coordinate, attack_type?: AttackType): Promise<{ 
     result: SubmissionResult; 
     points: number; 
     ship_id?: string;
     correct_attack_type?: boolean;
     correct_location?: boolean;
-  } {
+  }> {
     // Check if this exact coordinate has already been submitted by the team
     const alreadySubmitted = this.submissions.some(sub => {
       const sameRow = coord.row && sub.row === coord.row;
@@ -171,9 +162,7 @@ export class GameState {
       };
       
       this.submissions.push(submission);
-      
-      // Persist to database
-      gameDatabase.saveSubmission(submission);
+      await gameDatabase.saveSubmission(submission);
 
       return {
         result: 'duplicate',
@@ -264,10 +253,8 @@ export class GameState {
       };
       
       this.submissions.push(submission);
-
-      // Persist to database
-      gameDatabase.saveSubmission(submission);
-      gameDatabase.updateTeamScore(this.team_id, this.score, this.ships_sunk);
+      await gameDatabase.saveSubmission(submission);
+      await gameDatabase.updateTeamScore(this.team_id, this.score, this.ships_sunk);
 
       return { 
         result: 'miss', 
@@ -308,11 +295,9 @@ export class GameState {
     };
 
     this.submissions.push(submission);
-
-    // Persist to database
-    gameDatabase.saveSubmission(submission);
-    gameDatabase.updateTeamScore(this.team_id, this.score, this.ships_sunk);
-    gameDatabase.saveShip(this.team_id, matched_ship);
+    await gameDatabase.saveSubmission(submission);
+    await gameDatabase.updateTeamScore(this.team_id, this.score, this.ships_sunk);
+    await gameDatabase.saveShip(this.team_id, matched_ship);
 
     return { 
       result, 
@@ -342,7 +327,7 @@ export class GameState {
   }
 
   // Activate ships based on difficulty phase
-  activateShips(targetCount: number): { activated: boolean; newShips: Ship[] } {
+  async activateShips(targetCount: number): Promise<{ activated: boolean; newShips: Ship[] }> {
     let currentlyActive = this.ships.filter(s => s.is_active).length;
     
     if (currentlyActive >= targetCount) {
@@ -362,11 +347,9 @@ export class GameState {
       newShips.push(shuffled[i]);
     }
     
-    // Persist activated ships to database
     if (newShips.length > 0) {
-      gameDatabase.saveShips(this.team_id, newShips);
+      await gameDatabase.saveShips(this.team_id, newShips);
     }
-    
     return { activated: newShips.length > 0, newShips };
   }
 

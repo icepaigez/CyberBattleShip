@@ -58,12 +58,10 @@ export function getTeamConnections(team_id: string): number {
 }
 
 // Admin: Create a team
-export const createTeam = (_req: Request, res: Response): void => {
+export const createTeam = async (_req: Request, res: Response): Promise<void> => {
   try {
     const team_id = generateTeamCode();
-    // Use team_id (code) as the team_name for display
-    gameManager.createTeam(team_id, team_id);
-
+    await gameManager.createTeam(team_id, team_id);
     res.json({
       team_id,
       team_name: team_id,
@@ -76,7 +74,7 @@ export const createTeam = (_req: Request, res: Response): void => {
 };
 
 // Admin: Create multiple teams
-export const createMultipleTeams = (req: Request, res: Response): void => {
+export const createMultipleTeams = async (req: Request, res: Response): Promise<void> => {
   try {
     const { count } = req.body;
 
@@ -86,11 +84,9 @@ export const createMultipleTeams = (req: Request, res: Response): void => {
     }
 
     const teams: TeamInfo[] = [];
-    
     for (let i = 1; i <= count; i++) {
       const team_id = generateTeamCode();
-      // Use team_id (code) as the team_name for display
-      gameManager.createTeam(team_id, team_id);
+      await gameManager.createTeam(team_id, team_id);
       teams.push({
         team_id,
         team_name: team_id,
@@ -189,16 +185,15 @@ export const getTeamStatus = (req: Request, res: Response): void => {
 };
 
 // Admin: Clear all teams (only allowed when competition is not active)
-export const clearAllTeams = (_req: Request, res: Response): void => {
+export const clearAllTeams = async (_req: Request, res: Response): Promise<void> => {
   try {
-    // Check if competition is active
     if (gameManager.isCompetitionActive()) {
       res.status(403).json({ error: 'Cannot clear teams while competition is active' });
       return;
     }
 
-    const count = gameManager.clearAllGames();
-    teamConnections.clear(); // Clear all connection tracking
+    const count = await gameManager.clearAllGames();
+    teamConnections.clear();
 
     res.json({ 
       message: `Successfully cleared ${count} teams`,
@@ -211,7 +206,7 @@ export const clearAllTeams = (_req: Request, res: Response): void => {
 };
 
 // Admin: Delete selected teams (only allowed when competition is not active)
-export const deleteSelectedTeams = (req: Request, res: Response): void => {
+export const deleteSelectedTeams = async (req: Request, res: Response): Promise<void> => {
   try {
     if (gameManager.isCompetitionActive()) {
       res.status(403).json({ error: 'Cannot delete teams while competition is active' });
@@ -226,8 +221,8 @@ export const deleteSelectedTeams = (req: Request, res: Response): void => {
 
     let deletedCount = 0;
     for (const teamId of team_ids) {
-      if (gameManager.deleteGame(teamId)) {
-        teamConnections.delete(teamId); // Clear connections for this team
+      if (await gameManager.deleteGame(teamId)) {
+        teamConnections.delete(teamId);
         deletedCount++;
       }
     }

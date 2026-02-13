@@ -43,18 +43,14 @@ export class TrafficManager {
     const timers: NodeJS.Timeout[] = [];
 
     // Difficulty adjustment interval (every 60 seconds)
-    const difficultyInterval = setInterval(() => {
+    const difficultyInterval = setInterval(async () => {
       const phase = this.difficultyScaler.getCurrentPhase();
       const elapsedMinutes = this.difficultyScaler.getElapsedMinutes();
       
-      // Map difficulty phases to generator difficulty (1-3) for hint visibility
-      // Phases 1-3 (0-50 min): Show encoding labels [BASE64], [HEX], etc. - Learning
-      // Phases 4-5 (50+ min): NO encoding labels - Mastery (students must recognize patterns)
       const difficultyPhase = elapsedMinutes < 50 ? 1 : 3;
       generator.setDifficultyPhase(difficultyPhase);
       
-      // Time-based ship activation (backstop for slow teams)
-      const result = gameState.activateShips(phase.active_ships);
+      const result = await gameState.activateShips(phase.active_ships);
       
       // Notify team if new ships were activated
       if (result.activated) {

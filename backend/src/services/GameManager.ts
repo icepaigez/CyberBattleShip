@@ -21,12 +21,10 @@ export class GameManager {
 
   constructor(config: GameConfig = DEFAULT_CONFIG) {
     this.config = config;
-    this.loadFromDatabase();
   }
 
-  private loadFromDatabase(): void {
-    // Load competition state
-    const compState = gameDatabase.getCompetitionState();
+  async initialize(): Promise<void> {
+    const compState = await gameDatabase.getCompetitionState();
     if (compState) {
       if (compState.is_active && compState.start_time) {
         this.competition_start = new Date(compState.start_time);
@@ -37,15 +35,14 @@ export class GameManager {
       this.competition_duration_minutes = compState.duration_minutes;
     }
 
-    // Load all teams
-    const teams = gameDatabase.getAllTeams();
+    const teams = await gameDatabase.getAllTeams();
     for (const team of teams) {
-      const gameState = new GameState(team.team_id, team.team_name, this.config, true);
+      const gameState = new GameState(team.team_id, team.team_name, this.config);
+      await gameState.initialize(true);
       this.games.set(team.team_id, gameState);
     }
 
-    // Load first sinks
-    const firstSinks = gameDatabase.getAllFirstSinks();
+    const firstSinks = await gameDatabase.getAllFirstSinks();
     for (const sink of firstSinks) {
       this.first_sinks.set(sink.ship_key, {
         ship_id: sink.ship_key,
@@ -57,8 +54,9 @@ export class GameManager {
     console.log(`📦 Loaded ${teams.length} teams and ${firstSinks.length} first sinks from database`);
   }
 
-  createTeam(team_id: string, team_name: string): GameState {
+  async createTeam(team_id: string, team_name: string): Promise<GameState> {
     const game = new GameState(team_id, team_name, this.config);
+    await game.initialize(false);
     this.games.set(team_id, game);
     return game;
   }
@@ -71,7 +69,7 @@ export class GameManager {
     return Array.from(this.games.values());
   }
 
-  submitCoordinate(team_id: string, coord: Coordinate, attack_type?: AttackType): {
+  async submitCoordinate(team_id: string, coord: Coordinate, attack_type?: AttackType): Promise<{
     result: SubmissionResult;
     points: number;
     ship_id?: string;
@@ -80,13 +78,13 @@ export class GameManager {
     correct_attack_type?: boolean;
     correct_location?: boolean;
     new_ship_activated?: boolean;
-  } {
+  }> {
     const game = this.games.get(team_id);
     if (!game) {
       throw new Error(`Team ${team_id} not found`);
     }
 
-    const submission = game.submitCoordinate(coord, attack_type);
+    const submission = await game.submitCoordinate(coord, attack_type);
     let bonus_points = 0;
     let first_global_sink = false;
     let new_ship_activated = false;
@@ -107,23 +105,18 @@ export class GameManager {
             timestamp: new Date(),
           });
           
-          // Persist to database
-          gameDatabase.saveFirstSink(global_ship_key, team_id);
-          
+          await gameDatabase.saveFirstSink(global_ship_key, team_id);
           bonus_points = this.config.points_first_global;
           game.score += bonus_points;
-          
-          // Persist updated score
-          gameDatabase.updateTeamScore(team_id, game.score, game.ships_sunk);
+          await gameDatabase.updateTeamScore(team_id, game.score, game.ships_sunk);
           
           first_global_sink = true;
         }
       }
 
-      // Performance-based ship activation: Fast teams get more ships faster
       if (game.shouldActivateNewShip()) {
         const currentActive = game.getActiveShipCount();
-        const result = game.activateShips(currentActive + 1);
+        const result = await game.activateShips(currentActive + 1);
         new_ship_activated = result.activated;
       }
     }
@@ -166,23 +159,21 @@ export class GameManager {
     return scores;
   }
 
-  setCompetitionDuration(minutes: number): void {
+  async setCompetitionDuration(minutes: number): Promise<void> {
     if (this.isCompetitionActive()) {
       throw new Error('Cannot change duration while competition is active');
     }
     this.competition_duration_minutes = minutes;
-    gameDatabase.setCompetitionDuration(minutes);
+    await gameDatabase.setCompetitionDuration(minutes);
   }
 
   getCompetitionDuration(): number {
     return this.competition_duration_minutes;
   }
 
-  startCompetition(): void {
+  async startCompetition(): Promise<void> {
     this.competition_start = new Date();
-    
-    // Persist to database
-    gameDatabase.setCompetitionActive(true, this.competition_start);
+    await gameDatabase.setCompetitionActive(true, this.competition_start);
     
     // Clear any existing timer
     if (this.auto_end_timer) {
@@ -199,11 +190,9 @@ export class GameManager {
     console.log(`🚀 Competition started! Will auto-end in ${this.competition_duration_minutes} minutes.`);
   }
 
-  endCompetition(): void {
+  async endCompetition(): Promise<void> {
     this.competition_end = new Date();
-    
-    // Persist to database
-    gameDatabase.endCompetition(this.competition_end);
+    await gameDatabase.endCompetition(this.competition_end);
     
     // Clear the auto-end timer
     if (this.auto_end_timer) {
@@ -257,27 +246,19 @@ export class GameManager {
     this.competition_end = undefined;
   }
 
-  // Clear all games/teams (but not competition status)
-  clearAllGames(): number {
+  async clearAllGames(): Promise<number> {
     const count = this.games.size;
     this.games.clear();
     this.first_sinks.clear();
-    
-    // Clear from database
-    gameDatabase.clearAllTeams();
-    
+    await gameDatabase.clearAllTeams();
     return count;
   }
 
-  // Delete a single game/team
-  deleteGame(team_id: string): boolean {
+  async deleteGame(team_id: string): Promise<boolean> {
     const deleted = this.games.delete(team_id);
-    
     if (deleted) {
-      // Delete from database
-      gameDatabase.deleteTeam(team_id);
+      await gameDatabase.deleteTeam(team_id);
     }
-    
     return deleted;
   }
 }

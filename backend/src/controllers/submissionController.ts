@@ -2,9 +2,9 @@ import { Request, Response } from 'express';
 import { gameManager } from './teamController.js';
 import { parseCoordinate } from '../models/Ship.js';
 
-export const submitCoordinate = (req: Request, res: Response): void => {
+export const submitCoordinate = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { team_id, row, column } = req.body;
+    const { team_id, row, column, attack_type } = req.body;
 
     if (!team_id || !row || !column) {
       res.status(400).json({ error: 'team_id, row, and column are required' });
@@ -23,7 +23,7 @@ export const submitCoordinate = (req: Request, res: Response): void => {
       return;
     }
 
-    const result = gameManager.submitCoordinate(team_id, coord);
+    const result = await gameManager.submitCoordinate(team_id, coord, attack_type);
 
     let message = '';
     if (result.result === 'hit') {
