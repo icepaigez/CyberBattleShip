@@ -64,12 +64,12 @@ export async function login(req: Request, res: Response): Promise<void> {
   const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_MS);
   await gameDatabase.saveAdminSession(token, expiresAt);
 
-  const isProd = process.env.NODE_ENV === "production";
+  const isHttps = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https';
   res
     .cookie(SESSION_COOKIE, token, {
       httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? "strict" : "lax",
+      secure: isHttps,
+      sameSite: isHttps ? "strict" : "lax",
       maxAge: SESSION_MAX_AGE_MS,
       path: "/",
     })
