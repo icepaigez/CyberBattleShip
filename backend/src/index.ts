@@ -2,6 +2,12 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import teamRoutes from './routes/teamRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
 import competitionRoutes from './routes/competitionRoutes.js';
@@ -45,6 +51,19 @@ app.get('/health', (_req, res) => {
 app.use('/api', teamRoutes);
 app.use('/api/game', gameRoutes);
 app.use('/api/competition', competitionRoutes);
+
+// Serve static frontend (when deployed as single app)
+const publicPath = path.join(__dirname, '../public');
+if (fs.existsSync(publicPath)) {
+  app.use(express.static(publicPath));
+  app.get('*', (req, res, next) => {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/socket.io')) {
+      res.sendFile(path.join(publicPath, 'index.html'));
+    } else {
+      next();
+    }
+  });
+}
 
 // WebSocket setup
 setupGameSocket(io);

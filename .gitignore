@@ -53,3 +53,4 @@ backend/.env.*
 .taskmaster/
 docs/
 .env.*
+creds/

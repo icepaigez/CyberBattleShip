@@ -1,0 +1,66 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ secrets.EC2_APP_URL }}
+
+      - name: Prepare deploy package
+        run: |
+          mkdir -p deploy/backend deploy/backend/public
+          cp -r backend/dist backend/package.json backend/package-lock.json deploy/backend/
+          cp -r frontend/dist/* deploy/backend/public/
+
+      - name: Create .env for deploy
+        run: |
+          cat > deploy/backend/.env << EOF
+          PORT=3000
+          NODE_ENV=production
+          CORS_ORIGIN=${{ secrets.CORS_ORIGIN || '*' }}
+          TURSO_DATABASE_URL=${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN=${{ secrets.TURSO_AUTH_TOKEN }}
+          EOF
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Ensure deploy directory exists
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "mkdir -p ~/battleship/backend"
+
+      - name: Deploy to EC2
+        run: |
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r deploy/backend/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/battleship/backend/
+
+      - name: Restart application
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            cd ~/battleship/backend
+            npm install --production
+            pm2 restart battleship-backend || pm2 start dist/index.js --name battleship-backend
+            pm2 save
+          EOF
