@@ -62,6 +62,6 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
             cd ~/battleship/backend
             npm install --production
-            pm2 restart battleship-backend || pm2 start dist/index.js --name battleship-backend
+            pm2 restart battleship-backend || pm2 start --name battleship-backend --node-args="--env-file=.env" dist/index.js
             pm2 save
           EOF
