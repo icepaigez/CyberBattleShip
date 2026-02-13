@@ -28,7 +28,7 @@ jobs:
       - name: Prepare deploy package
         run: |
           mkdir -p deploy/backend deploy/backend/public
-          cp -r backend/dist backend/package.json backend/ecosystem.config.js deploy/backend/
+          cp -r backend/dist backend/package.json backend/ecosystem.config.cjs deploy/backend/
           cp -r frontend/dist/* deploy/backend/public/
 
       - name: Create .env for deploy
@@ -55,7 +55,7 @@ jobs:
 
       - name: Deploy to EC2
         run: |
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r deploy/backend/dist deploy/backend/package.json deploy/backend/ecosystem.config.js deploy/backend/public deploy/backend/.env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/battleship/backend/
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r deploy/backend/dist deploy/backend/package.json deploy/backend/ecosystem.config.cjs deploy/backend/public deploy/backend/.env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/battleship/backend/
 
       - name: Restart application
         run: |
@@ -63,6 +63,6 @@ jobs:
             cd ~/battleship/backend
             npm install --production
             pm2 delete battleship-backend 2>/dev/null || true
-            pm2 start ecosystem.config.js
+            pm2 start ecosystem.config.cjs
             pm2 save
           EOF
