@@ -28,7 +28,7 @@ jobs:
       - name: Prepare deploy package
         run: |
           mkdir -p deploy/backend deploy/backend/public
-          cp -r backend/dist backend/package.json backend/package-lock.json deploy/backend/
+          cp -r backend/dist backend/package.json deploy/backend/
           cp -r frontend/dist/* deploy/backend/public/
 
       - name: Create .env for deploy
