@@ -55,7 +55,7 @@ jobs:
 
       - name: Deploy to EC2
         run: |
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r deploy/backend/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/battleship/backend/
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r deploy/backend/dist deploy/backend/package.json deploy/backend/public deploy/backend/.env ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/battleship/backend/
 
       - name: Restart application
         run: |
