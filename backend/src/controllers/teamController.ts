@@ -58,7 +58,7 @@ export function getTeamConnections(team_id: string): number {
 }
 
 // Admin: Create a team
-export const createTeam = (req: Request, res: Response): void => {
+export const createTeam = (_req: Request, res: Response): void => {
   try {
     const team_id = generateTeamCode();
     // Use team_id (code) as the team_name for display
@@ -143,7 +143,7 @@ export const joinTeam = (req: Request, res: Response): void => {
 };
 
 // Get all teams (admin)
-export const getAllTeams = (req: Request, res: Response): void => {
+export const getAllTeams = (_req: Request, res: Response): void => {
   try {
     const games = gameManager.getAllGames();
     const teams = games.map(game => ({
@@ -189,7 +189,7 @@ export const getTeamStatus = (req: Request, res: Response): void => {
 };
 
 // Admin: Clear all teams (only allowed when competition is not active)
-export const clearAllTeams = (req: Request, res: Response): void => {
+export const clearAllTeams = (_req: Request, res: Response): void => {
   try {
     // Check if competition is active
     if (gameManager.isCompetitionActive()) {
@@ -240,7 +240,7 @@ export const deleteSelectedTeams = (req: Request, res: Response): void => {
 };
 
 // Player: Claim a random available team
-export const claimRandomTeam = (req: Request, res: Response): void => {
+export const claimRandomTeam = (_req: Request, res: Response): void => {
   try {
     const games = gameManager.getAllGames();
     

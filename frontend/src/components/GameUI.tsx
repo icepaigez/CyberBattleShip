@@ -32,7 +32,7 @@ interface LeaderboardEntry {
     incorrect_count: number;
 }
 
-export function GameUI({ socket, teamState, trafficMessages, onSubmitCoordinate, onLeaveTeam, submitting, showTutorial, onCloseTutorial, onOpenTutorial }: Props) {
+export function GameUI({ socket: _socket, teamState, trafficMessages, onSubmitCoordinate, onLeaveTeam, submitting, showTutorial, onCloseTutorial, onOpenTutorial }: Props) {
     const [showLeaderboard, setShowLeaderboard] = useState(false);
     const [showTools, setShowTools] = useState(false);
     const [showGlossary, setShowGlossary] = useState(false);

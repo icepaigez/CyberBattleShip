@@ -26,7 +26,7 @@ export const setCompetitionDuration = (req: Request, res: Response): void => {
 };
 
 // Start competition
-export const startCompetition = (req: Request, res: Response): void => {
+export const startCompetition = (_req: Request, res: Response): void => {
   try {
     // Check if competition is already active
     if (gameManager.isCompetitionActive()) {
@@ -61,7 +61,7 @@ export const startCompetition = (req: Request, res: Response): void => {
 };
 
 // End competition
-export const endCompetition = (req: Request, res: Response): void => {
+export const endCompetition = (_req: Request, res: Response): void => {
   try {
     gameManager.endCompetition();
     trafficManager.stopAllTraffic();
@@ -78,7 +78,7 @@ export const endCompetition = (req: Request, res: Response): void => {
 };
 
 // Get competition status
-export const getCompetitionStatus = (req: Request, res: Response): void => {
+export const getCompetitionStatus = (_req: Request, res: Response): void => {
   try {
     const status = gameManager.getCompetitionStatus();
     res.json(status);
@@ -89,7 +89,7 @@ export const getCompetitionStatus = (req: Request, res: Response): void => {
 };
 
 // Get leaderboard
-export const getLeaderboard = (req: Request, res: Response): void => {
+export const getLeaderboard = (_req: Request, res: Response): void => {
   try {
     const leaderboard = gameManager.getLeaderboard();
     res.json({ leaderboard });
