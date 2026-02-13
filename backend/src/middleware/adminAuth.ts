@@ -8,7 +8,7 @@ const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // Debug: Log whether ADMIN_PASSWORD is set (don't log the actual password)
 if (!ADMIN_PASSWORD) {
-  console.warn("⚠️ ADMIN_PASSWORD not set or empty in environment");
+  console.warn("⚠️ ADMIN_PASSWORD not set or empty in environment!");
 }
 
 function getSessionToken(req: Request): string | undefined {
