@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { gameManager, getTeamConnections } from './teamController.js';
-import { trafficManager } from '../index.js';
+import { trafficManager, io } from '../index.js';
 
 // Set competition duration
 export const setCompetitionDuration = async (req: Request, res: Response): Promise<void> => {
@@ -45,6 +45,13 @@ export const startCompetition = async (_req: Request, res: Response): Promise<vo
       trafficManager.startTrafficForTeam(game.team_id, game);
     });
 
+    // Notify all connected players that competition has started
+    io.emit('competition_started', {
+      message: '🚀 Competition has started! Good luck!',
+      start_time: status.start_time,
+      duration_minutes: status.duration_minutes,
+    });
+
     res.json({
       success: true,
       message: 'Competition started',
@@ -63,10 +70,19 @@ export const endCompetition = async (_req: Request, res: Response): Promise<void
     await gameManager.endCompetition();
     trafficManager.stopAllTraffic();
 
+    const status = gameManager.getCompetitionStatus();
+
+    // Notify all connected players that competition has ended
+    io.emit('competition_ended', {
+      message: '🏁 Competition has ended! Final scores have been recorded.',
+      end_time: status.end_time,
+      duration_minutes: status.duration_minutes,
+    });
+
     res.json({
       success: true,
       message: 'Competition ended',
-      status: gameManager.getCompetitionStatus(),
+      status,
     });
   } catch (error) {
     console.error('Error ending competition:', error);

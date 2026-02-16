@@ -16,6 +16,7 @@ function App() {
     const [showTutorial, setShowTutorial] = useState(false);
     const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
     const [notificationQueue, setNotificationQueue] = useState<Array<{ type: 'success' | 'error' | 'info'; message: string }>>([]);
+    const [competitionEnded, setCompetitionEnded] = useState(false);
 
     // Auto-rejoin on page refresh
     useEffect(() => {
@@ -107,6 +108,23 @@ function App() {
             });
         });
 
+        socket.on('competition_started', (data: { message: string; start_time?: string; duration_minutes?: number }) => {
+            setCompetitionEnded(false);
+            addNotification({
+                type: 'success',
+                message: data.message
+            });
+        });
+
+        socket.on('competition_ended', (data: { message: string; end_time?: string; duration_minutes?: number }) => {
+            setCompetitionEnded(true);
+            setSubmitting(false);
+            addNotification({
+                type: 'info',
+                message: data.message
+            });
+        });
+
         return () => {
             socket.off('team_joined');
             socket.off('error');
@@ -114,6 +132,8 @@ function App() {
             socket.off('traffic_message');
             socket.off('submission_result');
             socket.off('new_threat_detected');
+            socket.off('competition_started');
+            socket.off('competition_ended');
         };
     }, [socket]);
 
@@ -133,7 +153,7 @@ function App() {
     };
 
     const handleSubmitCoordinate = (row?: GridRow, column?: GridColumn, attackType?: AttackType) => {
-        if (!socket || !teamState) return;
+        if (!socket || !teamState || competitionEnded) return;
 
         setSubmitting(true);
         socket.emit('submit_coordinate', {
@@ -170,7 +190,7 @@ function App() {
                 trafficMessages={trafficMessages}
                 onSubmitCoordinate={handleSubmitCoordinate}
                 onLeaveTeam={handleLeaveTeam}
-                submitting={submitting}
+                submitting={submitting || competitionEnded}
                 showTutorial={showTutorial}
                 onCloseTutorial={() => setShowTutorial(false)}
                 onOpenTutorial={() => setShowTutorial(true)}

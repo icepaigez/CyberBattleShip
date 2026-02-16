@@ -177,15 +177,15 @@ export class GameState {
     let correct_location = false;
     let matched_ship: Ship | null = null;
 
-    // Check each ship for location match
+    // First pass: Look for FULL match (both row AND column)
     for (const ship of this.ships) {
       if (ship.status === 'sunk') continue;
 
       const row_match = coord.row ? ship.row === coord.row : false;
       const column_match = coord.column ? ship.column === coord.column : false;
-      const location_match = row_match || column_match;
 
-      if (location_match) {
+      if (row_match && column_match) {
+        // Found exact match - prioritize this over partial matches
         matched_ship = ship;
         correct_location = true;
         
@@ -198,20 +198,12 @@ export class GameState {
           points += this.config.points_partial;
         }
 
-        // Update ship status based on what was revealed
-        if (is_new_row) {
-          ship.revealed_row = true;
-          if (ship.status === 'hidden') {
-            ship.status = 'partial_row';
-          }
-        }
-        if (is_new_column) {
-          ship.revealed_column = true;
-          if (ship.status === 'hidden') {
-            ship.status = 'partial_column';
-          } else if (ship.status === 'partial_row') {
-            ship.status = 'partial_column';
-          }
+        // Update ship status
+        if (is_new_row) ship.revealed_row = true;
+        if (is_new_column) ship.revealed_column = true;
+        
+        if (ship.status === 'hidden') {
+          ship.status = 'partial_column';
         }
 
         // Check if attack type was also guessed correctly
@@ -219,25 +211,105 @@ export class GameState {
           correct_attack_type = true;
           points += this.config.points_attack_type;
 
-          // If BOTH location and attack type are correct, and both row/col revealed - SINK THE SHIP!
-          if (row_match && column_match) {
-            ship.status = 'sunk';
-            ship.revealed_row = true;
-            ship.revealed_column = true;
-            ship.sunk_at = new Date();
-            this.ships_sunk++;
-            
-            // Award sink bonus (total will be points_partial + points_attack_type + additional sink bonus)
-            points = this.config.points_sink;
-          }
+          // SINK THE SHIP!
+          ship.status = 'sunk';
+          ship.revealed_row = true;
+          ship.revealed_column = true;
+          ship.sunk_at = new Date();
+          this.ships_sunk++;
+          
+          // Award sink bonus
+          points = this.config.points_sink;
         }
 
-        break; // Found a match, stop checking other ships
+        break; // Found full match, stop checking
       }
     }
 
-    // If no location match, it's a miss
+    // Second pass: If no full match, look for partial match (row OR column)
     if (!matched_ship) {
+      for (const ship of this.ships) {
+        if (ship.status === 'sunk') continue;
+
+        const row_match = coord.row ? ship.row === coord.row : false;
+        const column_match = coord.column ? ship.column === coord.column : false;
+        const location_match = row_match || column_match;
+
+        if (location_match) {
+          matched_ship = ship;
+          correct_location = true;
+          
+          // Track if this is new information
+          let is_new_row = row_match && !ship.revealed_row;
+          let is_new_column = column_match && !ship.revealed_column;
+          
+          // Award points ONLY for NEW information
+          if (is_new_row || is_new_column) {
+            points += this.config.points_partial;
+          }
+
+          // Update ship status based on what was revealed
+          if (is_new_row) {
+            ship.revealed_row = true;
+            if (ship.status === 'hidden') {
+              ship.status = 'partial_row';
+            }
+          }
+          if (is_new_column) {
+            ship.revealed_column = true;
+            if (ship.status === 'hidden') {
+              ship.status = 'partial_column';
+            } else if (ship.status === 'partial_row') {
+              ship.status = 'partial_column';
+            }
+          }
+
+          // Check if attack type was also guessed correctly
+          if (attack_type && attack_type === ship.attack_type) {
+            correct_attack_type = true;
+            points += this.config.points_attack_type;
+          }
+
+          break; // Found a partial match, stop checking
+        }
+      }
+    }
+
+    // If no location match, check if attack type is correct
+    if (!matched_ship) {
+      // Third pass: Check if attack_type matches any active ship (location wrong, but attack type right)
+      if (attack_type) {
+        const type_match_ship = this.ships.find(s => s.is_active && s.status !== 'sunk' && s.attack_type === attack_type);
+        if (type_match_ship) {
+          // Correct attack type identified, but wrong location
+          points = this.config.points_attack_type;
+          this.score += points;
+
+          const submission: Submission = {
+            team_id: this.team_id,
+            row: coord.row,
+            column: coord.column,
+            attack_type,
+            result: 'correct_type',
+            timestamp: new Date(),
+            points_awarded: points,
+            correct_attack_type: true,
+          };
+          
+          this.submissions.push(submission);
+          await gameDatabase.saveSubmission(submission);
+          await gameDatabase.updateTeamScore(this.team_id, this.score, this.ships_sunk);
+
+          return { 
+            result: 'correct_type', 
+            points,
+            correct_attack_type: true,
+            correct_location: false
+          };
+        }
+      }
+
+      // Complete miss - wrong location and wrong/no attack type
       points = this.config.points_incorrect; // Negative points
       this.score += points;
 
