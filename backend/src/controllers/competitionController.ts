@@ -130,3 +130,30 @@ export const getPublicTeams = (_req: Request, res: Response): void => {
     res.status(500).json({ error: 'Failed to get teams' });
   }
 };
+
+// Admin: Full reset - clears everything including competition state and admin sessions
+export const fullReset = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    if (gameManager.isCompetitionActive()) {
+      res.status(403).json({ error: 'Cannot perform full reset while competition is active. End competition first.' });
+      return;
+    }
+
+    const teamCount = await gameManager.fullReset();
+    trafficManager.stopAllTraffic();
+
+    // Notify all connected clients
+    io.emit('full_reset', {
+      message: '🔄 System has been reset. Please refresh your page.',
+    });
+
+    res.json({
+      success: true,
+      message: `Full reset completed. Cleared ${teamCount} teams, competition state, and admin sessions.`,
+      teams_cleared: teamCount,
+    });
+  } catch (error) {
+    console.error('Error performing full reset:', error);
+    res.status(500).json({ error: 'Failed to perform full reset' });
+  }
+};

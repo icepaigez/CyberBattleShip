@@ -18,19 +18,26 @@ export class GameDatabase {
   constructor() {
     const tursoUrl = process.env.TURSO_DATABASE_URL;
     const tursoToken = process.env.TURSO_AUTH_TOKEN;
+    const isProduction = process.env.NODE_ENV === 'production';
 
-    if (tursoUrl && tursoToken) {
+    // Use Turso only in production with valid credentials
+    if (isProduction && tursoUrl && tursoToken) {
       this.db = createClient({ url: tursoUrl, authToken: tursoToken });
       this.useTurso = true;
-      console.log('📦 Using Turso database (cloud)');
+      console.log('📦 Using Turso database (cloud) - PRODUCTION');
     } else {
+      // Use local SQLite for development or when Turso not configured
       const dataDir = path.join(__dirname, '../../data');
       fs.mkdirSync(dataDir, { recursive: true });
       const dbPath = path.join(dataDir, 'battleship.db');
       this.db = new Database(dbPath) as Database.Database;
       (this.db as Database.Database).pragma('journal_mode = WAL');
       this.useTurso = false;
-      console.log('📦 Using SQLite database (local)');
+      console.log(`📦 Using SQLite database (local) - ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
+      
+      if (!isProduction) {
+        console.log('💡 Set NODE_ENV=production to use Turso cloud database');
+      }
     }
   }
 
@@ -186,6 +193,27 @@ export class GameDatabase {
       'DELETE FROM ships',
       'DELETE FROM submissions',
       'DELETE FROM first_sinks',
+    ];
+    if (this.useTurso) {
+      await (this.db as Client).batch(
+        statements.map((sql) => ({ sql })),
+        'write'
+      );
+    } else {
+      for (const sql of statements) {
+        (this.db as Database.Database).exec(sql);
+      }
+    }
+  }
+
+  async fullReset(): Promise<void> {
+    const statements = [
+      'DELETE FROM teams',
+      'DELETE FROM ships',
+      'DELETE FROM submissions',
+      'DELETE FROM first_sinks',
+      'DELETE FROM admin_sessions',
+      'UPDATE competition SET is_active = 0, start_time = NULL, end_time = NULL WHERE id = 1',
     ];
     if (this.useTurso) {
       await (this.db as Client).batch(

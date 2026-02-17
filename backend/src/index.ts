@@ -76,6 +76,19 @@ async function start(): Promise<void> {
   await gameDatabase.initialize();
   await gameManager.initialize();
 
+  // Restart traffic generation if competition is active
+  if (gameManager.isCompetitionActive()) {
+    const status = gameManager.getCompetitionStatus();
+    if (status.start_time) {
+      trafficManager.setCompetitionStart(status.start_time);
+    }
+    const games = gameManager.getAllGames();
+    games.forEach(game => {
+      trafficManager.startTrafficForTeam(game.team_id, game);
+    });
+    console.log('🔄 Resumed traffic generation for active competition');
+  }
+
   httpServer.listen(PORT, () => {
     console.log(`🚀 Backend server running on http://${HOST}:${PORT}`);
     console.log(`🔌 WebSocket server ready`);

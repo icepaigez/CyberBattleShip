@@ -6,6 +6,7 @@ import {
   getCompetitionStatus,
   getLeaderboard,
   getPublicTeams,
+  fullReset,
 } from '../controllers/competitionController.js';
 import { requireAdminAuth } from '../middleware/adminAuth.js';
 
@@ -20,5 +21,6 @@ router.get('/teams', getPublicTeams);
 router.post('/duration', requireAdminAuth, setCompetitionDuration);
 router.post('/start', requireAdminAuth, startCompetition);
 router.post('/end', requireAdminAuth, endCompetition);
+router.post('/full-reset', requireAdminAuth, fullReset);
 
 export default router;

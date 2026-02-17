@@ -44,6 +44,7 @@ export function Admin() {
     const [teams, setTeams] = useState<Team[]>([]);
     const [status, setStatus] = useState<CompetitionStatus>({ active: false, duration_minutes: 90 });
     const [loading, setLoading] = useState(false);
+    const [starting, setStarting] = useState(false);
     const [teamCount, setTeamCount] = useState(22);
     const [durationMinutes, setDurationMinutes] = useState(90);
     const [notification, setNotification] = useState<Notification | null>(null);
@@ -165,6 +166,10 @@ export function Admin() {
     };
 
     const startCompetition = async () => {
+        // Prevent multiple clicks
+        if (starting) return;
+        
+        setStarting(true);
         setLoading(true);
         try {
             const response = await adminFetch(`${API_URL}/api/competition/start`, { method: 'POST' }, onUnauthorized);
@@ -180,8 +185,11 @@ export function Admin() {
         } catch (error) {
             console.error('Start competition error:', error);
             setNotification({ message: 'Failed to start competition', type: 'error' });
+        } finally {
+            setLoading(false);
+            // Keep starting flag for a bit longer to prevent rapid re-clicks
+            setTimeout(() => setStarting(false), 2000);
         }
-        setLoading(false);
     };
 
     const endCompetition = () => {
@@ -197,6 +205,34 @@ export function Admin() {
                     fetchStatus();
                 } catch (error) {
                     setNotification({ message: 'Failed to end competition', type: 'error' });
+                }
+                setLoading(false);
+            }
+        });
+    };
+
+    const fullReset = () => {
+        setConfirmDialog({
+            message: `⚠️ FULL RESET: This will delete ALL teams, scores, submissions, competition times, and log you out. Are you absolutely sure?`,
+            type: 'danger',
+            onConfirm: async () => {
+                setConfirmDialog(null);
+                setLoading(true);
+                try {
+                    const response = await adminFetch(`${API_URL}/api/competition/full-reset`, { method: 'POST' }, onUnauthorized);
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        setNotification({ message: data.message, type: 'success' });
+                        fetchTeams();
+                        fetchStatus();
+                        // Will be logged out, so redirect to login
+                        setTimeout(() => setAuthenticated(false), 2000);
+                    } else {
+                        setNotification({ message: data.error || 'Failed to perform full reset', type: 'error' });
+                    }
+                } catch (error) {
+                    setNotification({ message: 'Failed to perform full reset', type: 'error' });
                 }
                 setLoading(false);
             }
@@ -417,10 +453,10 @@ export function Admin() {
                     <div className="action-group" style={{ marginTop: '1rem' }}>
                         <button
                             onClick={startCompetition}
-                            disabled={loading || status.active || teams.length === 0}
+                            disabled={loading || starting || status.active || teams.length === 0}
                             className="admin-btn admin-btn-success"
                         >
-                            ▶️ Start Competition ({durationMinutes} min)
+                            {starting ? '⏳ Starting...' : `▶️ Start Competition (${durationMinutes} min)`}
                         </button>
                         <button
                             onClick={endCompetition}
@@ -438,6 +474,22 @@ export function Admin() {
                             )}
                         </div>
                     )}
+                </div>
+
+                <div className="action-section" style={{ marginTop: '2rem', borderTop: '2px solid #dc3545', paddingTop: '1rem' }}>
+                    <h3 style={{ color: '#dc3545' }}>⚠️ Danger Zone</h3>
+                    <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '1rem' }}>
+                        Full reset clears everything: teams, scores, submissions, competition times, and admin sessions.
+                    </p>
+                    <button
+                        onClick={fullReset}
+                        disabled={loading || status.active}
+                        className="admin-btn admin-btn-danger"
+                        style={{ backgroundColor: '#dc3545', fontWeight: 'bold' }}
+                        title="Reset entire system (only works when competition is not active)"
+                    >
+                        🔄 Full System Reset
+                    </button>
                 </div>
             </div>
 

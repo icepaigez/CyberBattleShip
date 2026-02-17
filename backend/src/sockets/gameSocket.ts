@@ -14,16 +14,20 @@ export function setupGameSocket(io: Server): void {
     // Team join via WebSocket
     socket.on('join_team', (data: { team_id: string }) => {
       try {
-        const { team_id } = data;
+        let { team_id } = data;
 
         if (!team_id) {
           socket.emit('error', { message: 'team_id is required' });
           return;
         }
 
+        // Normalize team_id to uppercase for consistent matching
+        team_id = team_id.trim().toUpperCase();
+
         const game = gameManager.getGame(team_id);
         if (!game) {
-          socket.emit('error', { message: 'Team not found' });
+          console.warn(`Team not found: "${team_id}". Available teams: ${gameManager.getAllGames().map(g => g.team_id).join(', ')}`);
+          socket.emit('error', { message: 'Team not found. Please check your team code or contact your facilitator.' });
           return;
         }
 

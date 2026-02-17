@@ -125,6 +125,19 @@ function App() {
             });
         });
 
+        socket.on('full_reset', (data: { message: string }) => {
+            addNotification({
+                type: 'info',
+                message: data.message
+            });
+            // Clear local storage and force page reload after a short delay
+            setTimeout(() => {
+                localStorage.removeItem('cyber_battleships_team');
+                localStorage.removeItem('cyber_battleships_claimed_team');
+                window.location.reload();
+            }, 3000);
+        });
+
         return () => {
             socket.off('team_joined');
             socket.off('error');
@@ -134,6 +147,7 @@ function App() {
             socket.off('new_threat_detected');
             socket.off('competition_started');
             socket.off('competition_ended');
+            socket.off('full_reset');
         };
     }, [socket]);
 

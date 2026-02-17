@@ -70,8 +70,10 @@ export function JoinTeam({ onJoin, joining, error }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (teamId.trim()) {
-            onJoin(teamId.trim().toUpperCase());
+        const normalizedTeamId = teamId.trim().toUpperCase();
+        if (normalizedTeamId) {
+            console.log('Joining team:', normalizedTeamId);
+            onJoin(normalizedTeamId);
         }
     };
 

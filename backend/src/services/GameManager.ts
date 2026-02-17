@@ -18,6 +18,7 @@ export class GameManager {
   private competition_end?: Date;
   private competition_duration_minutes: number = 90; // Default 90 minutes
   private auto_end_timer?: NodeJS.Timeout;
+  private is_starting: boolean = false; // Prevents race condition during start
 
   constructor(config: GameConfig = DEFAULT_CONFIG) {
     this.config = config;
@@ -26,13 +27,43 @@ export class GameManager {
   async initialize(): Promise<void> {
     const compState = await gameDatabase.getCompetitionState();
     if (compState) {
+      // Only load competition times if competition is currently active
+      // This prevents loading stale end_time from previous competitions
       if (compState.is_active && compState.start_time) {
         this.competition_start = new Date(compState.start_time);
-      }
-      if (compState.end_time) {
+        this.competition_end = undefined; // Clear any previous end time
+        this.competition_duration_minutes = compState.duration_minutes;
+        
+        // Recreate auto-end timer based on remaining time
+        const now = new Date();
+        const elapsed_ms = now.getTime() - this.competition_start.getTime();
+        const duration_ms = this.competition_duration_minutes * 60 * 1000;
+        const remaining_ms = duration_ms - elapsed_ms;
+        
+        if (remaining_ms > 0) {
+          this.auto_end_timer = setTimeout(() => {
+            console.log(`⏰ Competition time (${this.competition_duration_minutes} minutes) has elapsed. Auto-ending...`);
+            this.endCompetition();
+          }, remaining_ms);
+          
+          const remaining_minutes = Math.floor(remaining_ms / 60000);
+          console.log(`⏱️ Competition in progress: ${remaining_minutes} minutes remaining`);
+        } else {
+          // Competition time has already elapsed, end it immediately
+          console.log('⏰ Competition time has elapsed. Ending now...');
+          await this.endCompetition();
+        }
+      } else if (compState.end_time) {
+        // Competition was ended, load both start and end times for historical data
+        if (compState.start_time) {
+          this.competition_start = new Date(compState.start_time);
+        }
         this.competition_end = new Date(compState.end_time);
       }
-      this.competition_duration_minutes = compState.duration_minutes;
+      
+      if (!compState.is_active) {
+        this.competition_duration_minutes = compState.duration_minutes;
+      }
     }
 
     const teams = await gameDatabase.getAllTeams();
@@ -172,22 +203,38 @@ export class GameManager {
   }
 
   async startCompetition(): Promise<void> {
-    this.competition_start = new Date();
-    await gameDatabase.setCompetitionActive(true, this.competition_start);
-    
-    // Clear any existing timer
-    if (this.auto_end_timer) {
-      clearTimeout(this.auto_end_timer);
+    // Prevent race condition if multiple start requests come in
+    if (this.is_starting) {
+      throw new Error('Competition start already in progress');
     }
     
-    // Set up auto-end timer
-    const duration_ms = this.competition_duration_minutes * 60 * 1000;
-    this.auto_end_timer = setTimeout(() => {
-      console.log(`⏰ Competition time (${this.competition_duration_minutes} minutes) has elapsed. Auto-ending...`);
-      this.endCompetition();
-    }, duration_ms);
+    if (this.isCompetitionActive()) {
+      throw new Error('Competition is already active');
+    }
+
+    this.is_starting = true;
     
-    console.log(`🚀 Competition started! Will auto-end in ${this.competition_duration_minutes} minutes.`);
+    try {
+      this.competition_start = new Date();
+      this.competition_end = undefined;
+      await gameDatabase.setCompetitionActive(true, this.competition_start);
+      
+      // Clear any existing timer
+      if (this.auto_end_timer) {
+        clearTimeout(this.auto_end_timer);
+      }
+      
+      // Set up auto-end timer
+      const duration_ms = this.competition_duration_minutes * 60 * 1000;
+      this.auto_end_timer = setTimeout(() => {
+        console.log(`⏰ Competition time (${this.competition_duration_minutes} minutes) has elapsed. Auto-ending...`);
+        this.endCompetition();
+      }, duration_ms);
+      
+      console.log(`🚀 Competition started! Will auto-end in ${this.competition_duration_minutes} minutes.`);
+    } finally {
+      this.is_starting = false;
+    }
   }
 
   async endCompetition(): Promise<void> {
@@ -244,6 +291,7 @@ export class GameManager {
     this.first_sinks.clear();
     this.competition_start = undefined;
     this.competition_end = undefined;
+    this.is_starting = false;
   }
 
   async clearAllGames(): Promise<number> {
@@ -251,6 +299,21 @@ export class GameManager {
     this.games.clear();
     this.first_sinks.clear();
     await gameDatabase.clearAllTeams();
+    return count;
+  }
+
+  async fullReset(): Promise<number> {
+    const count = this.games.size;
+    this.games.clear();
+    this.first_sinks.clear();
+    this.competition_start = undefined;
+    this.competition_end = undefined;
+    this.is_starting = false;
+    if (this.auto_end_timer) {
+      clearTimeout(this.auto_end_timer);
+      this.auto_end_timer = undefined;
+    }
+    await gameDatabase.fullReset();
     return count;
   }
 
