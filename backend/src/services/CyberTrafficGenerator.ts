@@ -159,16 +159,16 @@ export class CyberTrafficGenerator {
     // Generate message based on attack type
     const message = this.generateAttackMessage(ship.attack_type, encoded, encoding);
 
-    // Only show encoding type in phases 1-3 (0-50 min)
-    // From phase 4 onwards (50+ min), students must recognize encoding patterns themselves
-    const showEncodingHint = this.difficulty_phase < 3;
+    // Only show hints in phases 1-2 (< 50 min)
+    // From phase 3 onwards (50+ min), students must identify attack types and encoding themselves
+    const showHints = this.difficulty_phase < 3;
 
     return {
       ...message,
       contains_clue: true,
-      attack_type: ship.attack_type,
+      attack_type: showHints ? ship.attack_type : undefined, // Hide attack type icon in Phase 3
       encoded_data: encoded,
-      encoding_type: showEncodingHint ? encoding : undefined
+      encoding_type: showHints ? encoding : undefined
     };
   }
 
