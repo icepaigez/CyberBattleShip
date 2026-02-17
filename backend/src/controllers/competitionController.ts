@@ -116,14 +116,17 @@ export const getLeaderboard = (_req: Request, res: Response): void => {
 export const getPublicTeams = (_req: Request, res: Response): void => {
   try {
     const games = gameManager.getAllGames();
-    const teams = games.map(game => ({
-      team_id: game.team_id,
-      team_name: game.team_name,
-      score: game.score,
-      ships_sunk: game.ships_sunk,
-      active_players: getTeamConnections(game.team_id),
-      game_complete: game.isGameComplete(),
-    }));
+    const teams = games.map(game => {
+      const active_players = getTeamConnections(game.team_id);
+      return {
+        team_id: game.team_id,
+        team_name: game.team_name,
+        score: game.score,
+        ships_sunk: game.ships_sunk,
+        active_players,
+        game_complete: game.isGameComplete(),
+      };
+    });
     res.json({ teams, count: teams.length });
   } catch (error) {
     console.error('Error getting teams:', error);

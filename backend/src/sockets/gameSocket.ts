@@ -1,5 +1,5 @@
 import { Server, Socket } from 'socket.io';
-import { gameManager, addTeamConnection, removeTeamConnection } from '../controllers/teamController.js';
+import { gameManager, addTeamConnection, removeTeamConnection, getTeamConnections } from '../controllers/teamController.js';
 import { isValidRow, isValidColumn, Coordinate, GridRow, GridColumn } from '../models/Ship.js';
 import { AttackType } from '../models/AttackTypes.js';
 import { trafficManager } from '../index.js';
@@ -43,7 +43,7 @@ export function setupGameSocket(io: Server): void {
         socketTeamMap.set(socket.id, team_id);
         addTeamConnection(team_id, socket.id);
 
-        console.log(`Socket ${socket.id} joined team ${team_id}`);
+        console.log(`Socket ${socket.id} joined team ${team_id}. Total connections for team: ${getTeamConnections(team_id)}`);
 
         // Send team state to the new player
         socket.emit('team_joined', {
@@ -180,13 +180,15 @@ export function setupGameSocket(io: Server): void {
     });
 
     // Handle disconnect
-    socket.on('disconnect', () => {
-      console.log(`Client disconnected: ${socket.id}`);
+    socket.on('disconnect', (reason) => {
+      console.log(`Client disconnected: ${socket.id}, reason: ${reason}`);
 
       const team_id = socketTeamMap.get(socket.id);
       if (team_id) {
         removeTeamConnection(team_id, socket.id);
         socketTeamMap.delete(socket.id);
+
+        console.log(`Removed ${socket.id} from team ${team_id}. Remaining connections: ${getTeamConnections(team_id)}`);
 
         // Notify team about player leaving
         io.to(team_id).emit('player_left', {

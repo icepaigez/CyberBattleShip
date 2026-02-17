@@ -41,12 +41,14 @@ export function addTeamConnection(team_id: string, socket_id: string): void {
     teamConnections.set(team_id, new Set());
   }
   teamConnections.get(team_id)!.add(socket_id);
+  console.log(`[Connections] Added ${socket_id} to ${team_id}. Total: ${teamConnections.get(team_id)!.size}`);
 }
 
 export function removeTeamConnection(team_id: string, socket_id: string): void {
   const connections = teamConnections.get(team_id);
   if (connections) {
     connections.delete(socket_id);
+    console.log(`[Connections] Removed ${socket_id} from ${team_id}. Remaining: ${connections.size}`);
     if (connections.size === 0) {
       teamConnections.delete(team_id);
     }
@@ -55,6 +57,14 @@ export function removeTeamConnection(team_id: string, socket_id: string): void {
 
 export function getTeamConnections(team_id: string): number {
   return teamConnections.get(team_id)?.size || 0;
+}
+
+// Debug function to log all connections
+export function logAllConnections(): void {
+  console.log('[Connections] Current state:');
+  for (const [team_id, sockets] of teamConnections.entries()) {
+    console.log(`  ${team_id}: ${sockets.size} player(s) - ${Array.from(sockets).join(', ')}`);
+  }
 }
 
 // Admin: Create a team

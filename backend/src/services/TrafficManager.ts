@@ -73,16 +73,20 @@ export class TrafficManager {
 
     // Main traffic generation interval
     const trafficInterval = setInterval(() => {
-      // Adjust leak probability based on team performance
-      let leak_prob = this.config.leak_probability;
-      if (gameState.ships_sunk > 2) {
-        leak_prob *= 0.7; // Reduce leaks if team is doing well
+      try {
+        // Adjust leak probability based on team performance
+        let leak_prob = this.config.leak_probability;
+        if (gameState.ships_sunk > 2) {
+          leak_prob *= 0.7; // Reduce leaks if team is doing well
+        }
+        
+        // Let generator randomize encoding across all 5 types
+        // This ensures students see all encodings in early phases before hints are removed
+        const message = generator.generateMessage(leak_prob);
+        this.io.to(team_id).emit('traffic_message', message);
+      } catch (error) {
+        console.error(`Error generating traffic for team ${team_id}:`, error);
       }
-      
-      // Let generator randomize encoding across all 5 types
-      // This ensures students see all encodings in early phases before hints are removed
-      const message = generator.generateMessage(leak_prob);
-      this.io.to(team_id).emit('traffic_message', message);
     }, this.config.noise_frequency_ms);
 
     timers.push(trafficInterval);

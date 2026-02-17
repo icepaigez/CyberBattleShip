@@ -89,7 +89,14 @@ function App() {
         });
 
         socket.on('traffic_message', (message: TrafficMessage) => {
-            setTrafficMessages(prev => [...prev, message]);
+            setTrafficMessages(prev => {
+                // Keep only last 200 messages to prevent memory issues
+                const newMessages = [...prev, message];
+                if (newMessages.length > 200) {
+                    return newMessages.slice(-200);
+                }
+                return newMessages;
+            });
         });
 
         socket.on('submission_result', (result: any) => {
