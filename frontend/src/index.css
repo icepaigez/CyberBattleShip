@@ -505,6 +505,55 @@ body {
 .grid-cell-sunk {
     background: rgba(244, 67, 54, 0.4);
     border-color: #f44336;
+    position: relative;
+    overflow: hidden;
+}
+
+.sunk-ship-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sunk-ship-icon {
+    font-size: 2rem;
+    animation: shipSink 2s ease-in-out infinite;
+    position: absolute;
+    filter: grayscale(1) brightness(0.6);
+}
+
+.sunk-ship-explosion {
+    font-size: 2.5rem;
+    animation: explosionPulse 1.5s ease-in-out infinite;
+    position: absolute;
+    opacity: 0.8;
+}
+
+@keyframes shipSink {
+    0%, 100% {
+        transform: translateY(0) rotate(-5deg);
+        opacity: 1;
+    }
+    50% {
+        transform: translateY(3px) rotate(5deg);
+        opacity: 0.9;
+    }
+}
+
+@keyframes explosionPulse {
+    0%, 100% {
+        transform: scale(0.8);
+        opacity: 0.6;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.9;
+    }
 }
 
 .grid-cell:hover {

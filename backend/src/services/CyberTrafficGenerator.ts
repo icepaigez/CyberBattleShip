@@ -6,6 +6,7 @@ export type EncodingType = 'base64' | 'hex' | 'rot13' | 'binary' | 'ascii';
 export class CyberTrafficGenerator {
   private ships: Ship[];
   private difficulty_phase: number = 1; // Controls hint visibility: 1=Explicit, 2=Vague, 3=None
+  private lastShownShipIndex: number = -1; // Track last ship to avoid immediate repeats
 
   constructor(ships: Ship[]) {
     this.ships = ships;
@@ -138,7 +139,21 @@ export class CyberTrafficGenerator {
       return this.generateNoiseMessage();
     }
 
-    const ship = active_ships[Math.floor(Math.random() * active_ships.length)];
+    // Better distribution: avoid showing same ship consecutively if possible
+    let shipIndex: number;
+    if (active_ships.length === 1) {
+      // Only one ship left - no choice
+      shipIndex = 0;
+    } else {
+      // Pick random, but avoid last shown if possible
+      do {
+        shipIndex = Math.floor(Math.random() * active_ships.length);
+      } while (shipIndex === this.lastShownShipIndex && active_ships.length > 1);
+      
+      this.lastShownShipIndex = shipIndex;
+    }
+
+    const ship = active_ships[shipIndex];
     const coordinate = `${ship.row}${ship.column}`;
     
     // Phase 3 (difficulty_phase 3, no hints): 25% chance of layered encoding

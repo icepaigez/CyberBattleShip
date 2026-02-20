@@ -4,9 +4,10 @@ import { ATTACK_TYPES } from '../types/attackTypes';
 
 interface Props {
     messages: TrafficMessage[];
+    totalCount: number;
 }
 
-export function TrafficObserver({ messages }: Props) {
+export function TrafficObserver({ messages, totalCount }: Props) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -49,7 +50,10 @@ export function TrafficObserver({ messages }: Props) {
             <div className="traffic-header">
                 <h3>📡 Network Traffic Monitor</h3>
                 <span className="traffic-count">
-                    {searchTerm ? `${filteredMessages.length} / ${messages.length}` : `${messages.length} logs`}
+                    {searchTerm 
+                        ? `${filteredMessages.length} / ${totalCount}` 
+                        : `${totalCount} logs`
+                    }
                 </span>
             </div>
             <div className="traffic-search">

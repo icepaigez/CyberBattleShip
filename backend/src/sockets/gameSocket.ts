@@ -12,9 +12,9 @@ export function setupGameSocket(io: Server): void {
     console.log(`Client connected: ${socket.id}`);
 
     // Team join via WebSocket
-    socket.on('join_team', (data: { team_id: string }) => {
+    socket.on('join_team', (data: { team_id: string; auto_rejoin?: boolean }) => {
       try {
-        let { team_id } = data;
+        let { team_id, auto_rejoin } = data;
 
         if (!team_id) {
           socket.emit('error', { message: 'team_id is required' });
@@ -27,7 +27,11 @@ export function setupGameSocket(io: Server): void {
         const game = gameManager.getGame(team_id);
         if (!game) {
           console.warn(`Team not found: "${team_id}". Available teams: ${gameManager.getAllGames().map(g => g.team_id).join(', ')}`);
-          socket.emit('error', { message: 'Team not found. Please check your team code or contact your facilitator.' });
+          // Silent error for auto-rejoin (don't show popup), loud error for manual join
+          socket.emit('error', { 
+            message: 'Team not found. Please check your team code or contact your facilitator.',
+            silent: auto_rejoin === true
+          });
           return;
         }
 

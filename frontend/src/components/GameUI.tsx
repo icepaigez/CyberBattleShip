@@ -16,6 +16,7 @@ interface Props {
     socket: Socket;
     teamState: TeamState;
     trafficMessages: TrafficMessage[];
+    totalMessageCount: number;
     onSubmitCoordinate: (row?: GridRow, column?: GridColumn, attackType?: AttackType) => void;
     onLeaveTeam: () => void;
     submitting: boolean;
@@ -32,7 +33,7 @@ interface LeaderboardEntry {
     incorrect_count: number;
 }
 
-export function GameUI({ socket: _socket, teamState, trafficMessages, onSubmitCoordinate, onLeaveTeam, submitting, showTutorial, onCloseTutorial, onOpenTutorial }: Props) {
+export function GameUI({ socket: _socket, teamState, trafficMessages, totalMessageCount, onSubmitCoordinate, onLeaveTeam, submitting, showTutorial, onCloseTutorial, onOpenTutorial }: Props) {
     const [showLeaderboard, setShowLeaderboard] = useState(false);
     const [showTools, setShowTools] = useState(false);
     const [showGlossary, setShowGlossary] = useState(false);
@@ -165,7 +166,7 @@ export function GameUI({ socket: _socket, teamState, trafficMessages, onSubmitCo
                 </div>
 
                 <div className="panel panel-traffic">
-                    <TrafficObserver messages={trafficMessages} />
+                    <TrafficObserver messages={trafficMessages} totalCount={totalMessageCount} />
                 </div>
 
                 <div className="panel panel-submission">

@@ -10,6 +10,7 @@ function App() {
     const { socket, connected } = useSocket();
     const [teamState, setTeamState] = useState<TeamState | null>(null);
     const [trafficMessages, setTrafficMessages] = useState<TrafficMessage[]>([]);
+    const [totalMessageCount, setTotalMessageCount] = useState(0);
     const [joining, setJoining] = useState(false);
     const [joinError, setJoinError] = useState<string>('');
     const [submitting, setSubmitting] = useState(false);
@@ -25,7 +26,8 @@ function App() {
         const savedTeamCode = localStorage.getItem('cyber_battleships_team');
         if (savedTeamCode && !teamState && !joining) {
             setJoining(true);
-            socket.emit('join_team', { team_id: savedTeamCode });
+            // Mark this as an auto-rejoin attempt (not manual user input)
+            socket.emit('join_team', { team_id: savedTeamCode, auto_rejoin: true });
         }
     }, [socket, connected, teamState, joining]);
 
@@ -63,6 +65,21 @@ function App() {
             // Save team code for auto-rejoin on refresh
             localStorage.setItem('cyber_battleships_team', data.team_id);
 
+            // Restore traffic logs from localStorage (last 200 messages)
+            try {
+                const storedLogs = localStorage.getItem(`traffic_logs_${data.team_id}`);
+                const storedCount = localStorage.getItem(`traffic_count_${data.team_id}`);
+                if (storedLogs) {
+                    const parsed = JSON.parse(storedLogs);
+                    setTrafficMessages(parsed);
+                }
+                if (storedCount) {
+                    setTotalMessageCount(parseInt(storedCount, 10));
+                }
+            } catch (error) {
+                console.error('Failed to restore traffic logs:', error);
+            }
+
             // Show tutorial on first join (not on auto-rejoin)
             const hasSeenTutorial = localStorage.getItem('cyber_battleships_tutorial_seen');
             if (!hasSeenTutorial) {
@@ -71,17 +88,23 @@ function App() {
             }
         });
 
-        socket.on('error', (data: { message: string }) => {
-            setJoinError(data.message);
+        socket.on('error', (data: { message: string; silent?: boolean }) => {
             setJoining(false);
             setSubmitting(false); // Reset submitting state on error
             
-            // Clear claimed team from localStorage if team not found
+            // Clear stale team data from localStorage if team not found
             if (data.message.includes('not found') || data.message.includes('Team not found')) {
                 localStorage.removeItem('cyber_battleships_claimed_team');
+                localStorage.removeItem('cyber_battleships_team');
             }
             
-            addNotification({ type: 'error', message: data.message });
+            // Only show error notification if this was a manual action (not auto-rejoin)
+            if (!data.silent) {
+                setJoinError(data.message);
+                addNotification({ type: 'error', message: data.message });
+            } else {
+                console.log('Auto-rejoin failed (team no longer exists):', data.message);
+            }
         });
 
         socket.on('state_update', (data: Partial<TeamState>) => {
@@ -89,18 +112,65 @@ function App() {
         });
 
         socket.on('traffic_message', (message: TrafficMessage) => {
+            setTotalMessageCount(prev => {
+                const newCount = prev + 1;
+                // Persist count to localStorage
+                if (teamState) {
+                    localStorage.setItem(`traffic_count_${teamState.team_id}`, newCount.toString());
+                }
+                return newCount;
+            });
+            
             setTrafficMessages(prev => {
                 // Keep only last 200 messages to prevent memory issues
                 const newMessages = [...prev, message];
-                if (newMessages.length > 200) {
-                    return newMessages.slice(-200);
+                const capped = newMessages.length > 200 ? newMessages.slice(-200) : newMessages;
+                
+                // Persist messages to localStorage
+                if (teamState) {
+                    try {
+                        localStorage.setItem(`traffic_logs_${teamState.team_id}`, JSON.stringify(capped));
+                    } catch (error) {
+                        console.warn('Failed to save traffic logs to localStorage:', error);
+                    }
                 }
-                return newMessages;
+                
+                return capped;
             });
         });
 
         socket.on('submission_result', (result: any) => {
             setSubmitting(false);
+            
+            // Play sink sound effect if ship was sunk
+            if (result.ship_sunk) {
+                try {
+                    const audio = new Audio('/sounds/ship-sink.mp3');
+                    audio.volume = 0.5; // 50% volume
+                    audio.play().catch(err => {
+                        console.warn('Failed to play sink sound:', err);
+                        // Fallback: play a simple beep using Web Audio API
+                        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        oscillator.frequency.value = 200; // Low boom frequency
+                        oscillator.type = 'sine';
+                        
+                        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                        
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.5);
+                    });
+                } catch (error) {
+                    console.warn('Could not play sink sound effect:', error);
+                }
+            }
+            
             // Show feedback to user
             if (result.message) {
                 const type = result.result === 'miss' ? 'error' : result.result === 'hit' ? 'success' : 'info';
@@ -167,9 +237,15 @@ function App() {
     };
 
     const handleLeaveTeam = () => {
+        const teamId = teamState?.team_id;
         localStorage.removeItem('cyber_battleships_team');
+        if (teamId) {
+            localStorage.removeItem(`traffic_logs_${teamId}`);
+            localStorage.removeItem(`traffic_count_${teamId}`);
+        }
         setTeamState(null);
         setTrafficMessages([]);
+        setTotalMessageCount(0);
         setJoinError('');
     };
 
@@ -209,6 +285,7 @@ function App() {
                 socket={socket!}
                 teamState={teamState}
                 trafficMessages={trafficMessages}
+                totalMessageCount={totalMessageCount}
                 onSubmitCoordinate={handleSubmitCoordinate}
                 onLeaveTeam={handleLeaveTeam}
                 submitting={submitting || competitionEnded}
